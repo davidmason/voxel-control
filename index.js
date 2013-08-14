@@ -55,6 +55,9 @@ function Control(state, opts) {
 
   this.buffer = []
   this.paused = false
+
+  this.moveForwardFunction = opts.moveForward || undefined
+  this.jumpFunction = opts.jump || undefined
 }
 
 var cons = Control
@@ -83,20 +86,23 @@ proto.tick = function(dt) {
 
   if(!this._target) return
 
-  if(state.forward || state.backward) {
+  var forwardOrBackward = state.forward || state.backward;
+  if (!forwardOrBackward) {
+    this.z_accel_timer = this.accel_max_timer
+  }
+
+  if (forwardOrBackward) {
     this.z_accel_timer = max(0, this.z_accel_timer - dt)
   }
+
+  if(state.forward) {
+    this.moveForward(target, speed, dt);
+  }
+
   if(state.backward) {
     if(target.velocity.z < this.max_speed)
       target.velocity.z = max(min(this.max_speed, speed * dt * this.acceleration(this.z_accel_timer, this.accel_max_timer)), target.velocity.z)
-  } else if(state.forward) {
-    if(target.velocity.z > -this.max_speed)
-      target.velocity.z = min(max(-this.max_speed, -speed * dt * this.acceleration(this.z_accel_timer, this.accel_max_timer)), target.velocity.z)
-  } else {
-    this.z_accel_timer = this.accel_max_timer
-
   }
- 
 
   if(state.left || state.right) {
     this.x_accel_timer = max(0, this.x_accel_timer - dt)
@@ -120,10 +126,7 @@ proto.tick = function(dt) {
       this.jumping = false
     } else {
       this.jumping = true
-      if(this.jump_timer > 0) {
-        target.velocity.y = min(target.velocity.y + jump_speed * min(dt, this.jump_timer), this.jump_max_speed)
-      }
-      this.jump_timer = max(this.jump_timer - dt, 0)
+      this.jump(target, dt)
     }
   } else {
     this.jumping = false
@@ -163,6 +166,27 @@ proto.tick = function(dt) {
   this.state.x_rotation_accum =
   this.state.y_rotation_accum =
   this.state.z_rotation_accum = 0
+}
+
+proto.moveForward = function(target, speed, dt) {
+  if (this.moveForwardFunction) {
+    this.moveForwardFunction(target, speed, dt);
+  } else {
+    if(target.velocity.z > -this.max_speed)
+      target.velocity.z = min(max(-this.max_speed, -speed * dt * this.acceleration(this.z_accel_timer, this.accel_max_timer)), target.velocity.z)
+  }
+}
+
+proto.jump = function(target, dt) {
+  if (this.jumpFunction) {
+    this.jumpFunction(target, dt)
+  } else {
+    // original function
+    if(this.jump_timer > 0) {
+        target.velocity.y = min(target.velocity.y + this.jump_speed * min(dt, this.jump_timer), this.jump_max_speed)
+    }
+    this.jump_timer = max(this.jump_timer - dt, 0)
+  }
 }
 
 proto.write = function(changes) {
